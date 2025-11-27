@@ -25,7 +25,7 @@ UI_PORT=3000      # Puerto del servidor web (default: 3000)
 ## Ejecución
 
 ```bash
-node cliente_vigilante.js
+node app.js
 ```
 
 Verás:
@@ -80,7 +80,7 @@ Obtiene estadísticas de detecciones.
 ## Flujo de Datos
 
 ```
-server.py → [detecciones JSON] → cliente_vigilante.js:9000
+server.py → [detecciones JSON] → app.js:9000
                                           ↓
                                     [SQLite DB]
                                           ↓
