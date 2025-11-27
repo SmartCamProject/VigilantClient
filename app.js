@@ -62,43 +62,49 @@ function handleDetection(msg) {
     );
 }
 
-// Cliente TCP
-function startTcpClient() {
-    let socket = new net.Socket();
-    let buffer = "";
+// Servidor TCP (recibe detecciones del server.py)
+function startTcpServer() {
+    const server = net.createServer((socket) => {
+        console.log(`[TCP] Cliente conectado: ${socket.remoteAddress}:${socket.remotePort}`);
 
-    socket.connect(TV_PORT, TV_HOST, () =>
-        console.log(`[TCP] Conectado a ${TV_HOST}:${TV_PORT}`)
-    );
+        let buffer = "";
 
-    socket.on('data', chunk => {
-        buffer += chunk.toString();
-        let idx;
+        socket.on('data', chunk => {
+            buffer += chunk.toString();
+            let idx;
 
-        while ((idx = buffer.indexOf("\n")) >= 0) {
-            const line = buffer.slice(0, idx).trim();
-            buffer = buffer.slice(idx + 1);
+            while ((idx = buffer.indexOf("\n")) >= 0) {
+                const line = buffer.slice(0, idx).trim();
+                buffer = buffer.slice(idx + 1);
 
-            if (line) {
-                try {
-                    const json = JSON.parse(line);
-                    handleDetection(json);
-                } catch (err) {
-                    console.error("[TCP] JSON inválido:", line);
+                if (line) {
+                    try {
+                        const json = JSON.parse(line);
+                        console.log(`[TCP] Detección recibida: ${json.label} (${json.score}) - ${json.cameraId}`);
+                        handleDetection(json);
+                    } catch (err) {
+                        console.error("[TCP] JSON inválido:", line);
+                    }
                 }
             }
-        }
+        });
+
+        socket.on('close', () => {
+            console.log("[TCP] Cliente desconectado");
+        });
+
+        socket.on('error', (err) => {
+            console.error("[TCP] Error:", err.message);
+        });
     });
 
-    socket.on('close', () => {
-        console.warn("[TCP] Conexión cerrada. Reintentando...");
-        setTimeout(startTcpClient, 2000);
+    server.listen(TV_PORT, '0.0.0.0', () => {
+        console.log(`[TCP] Servidor escuchando en puerto ${TV_PORT}`);
+        console.log(`[TCP] Esperando conexión del server.py...`);
     });
-
-    socket.on('error', () => {});
 }
 
-startTcpClient();
+startTcpServer();
 
 // EXPRESS
 const app = express();
@@ -115,7 +121,7 @@ app.get("/api/detections", (req, res) => {
     const where = [];
 
     if (camera) { where.push("camera_id = ?"); params.push(camera); }
-    if (label)  { where.push("label = ?"); params.push(label); }
+    if (label) { where.push("label = ?"); params.push(label); }
 
     if (where.length) sql += " WHERE " + where.join(" AND ");
     sql += " ORDER BY id DESC LIMIT 200";
